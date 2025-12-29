@@ -1,25 +1,18 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { getDocument, updateDocument, archiveDocument } from "@/lib/db";
 
 export async function GET(
   req: Request,
   { params }: { params: { documentId: string } }
 ) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user || !session.user.id) {
+  if (!session || !session.user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const document = await prisma.document.findUnique({
-    where: {
-      id: params.documentId,
-      userId: session.user.id,
-    },
-  });
+  const document = await getDocument(params.documentId, session.user.id);
 
   if (!document) {
     return new NextResponse("Not Found", { status: 404 });
@@ -33,24 +26,18 @@ export async function PUT(
   { params }: { params: { documentId: string } }
 ) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user || !session.user.id) {
+  if (!session || !session.user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
   const { title, content, isPublished, icon, coverImage } = await req.json();
 
-  const document = await prisma.document.update({
-    where: {
-      id: params.documentId,
-      userId: session.user.id,
-    },
-    data: {
-      title,
-      content,
-      isPublished,
-      icon,
-      coverImage
-    },
+  const document = await updateDocument(params.documentId, session.user.id, {
+    title,
+    content,
+    is_published: isPublished,
+    icon,
+    cover_image: coverImage
   });
 
   return NextResponse.json(document);
@@ -61,20 +48,12 @@ export async function DELETE(
     { params }: { params: { documentId: string } }
 ) {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user || !session.user.id) {
+    if (!session || !session.user) {
         return new NextResponse("Unauthorized", { status: 401 });
     }
 
     // Instead of deleting, we'll archive the document
-    const document = await prisma.document.update({
-        where: {
-            id: params.documentId,
-            userId: session.user.id,
-        },
-        data: {
-            isArchived: true,
-        },
-    });
+    const document = await archiveDocument(params.documentId, session.user.id);
 
     return NextResponse.json(document);
 }
